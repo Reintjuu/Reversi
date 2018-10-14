@@ -172,7 +172,9 @@ namespace Reversi
 			while (true)
 			{
 				// If inside board bounds ...
-				if (row + rowDelta < BOARD_SIZE && row + rowDelta >= 0 && column + columnDelta < BOARD_SIZE &&
+				if (row + rowDelta < BOARD_SIZE &&
+				    row + rowDelta >= 0 &&
+				    column + columnDelta < BOARD_SIZE &&
 				    column + columnDelta >= 0)
 				{
 					// ... Check if current tile + delta is 'correct' ...
@@ -189,7 +191,7 @@ namespace Reversi
 							break;
 						}
 
-						// No more tiles in this direction and the last tile is not a player, so return an empty list.
+						// No more tiles in this direction and the last tile is not from the current player, so return an empty list.
 						return new List<Point>();
 					}
 				}
