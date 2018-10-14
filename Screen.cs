@@ -185,7 +185,7 @@ namespace Reversi
 					{
 						if (board[row + rowDelta, column + columnDelta] == currentPlayer && otherPieces.Any())
 						{
-							// We're done, the last tile is a player tile and we have other pieces in between.
+							// We're done, the last tile is the current player's tile and we have other pieces in between.
 							break;
 						}
 
