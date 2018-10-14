@@ -91,8 +91,8 @@ namespace Reversi
 			{
 				for (int column = 0; column < BOARD_SIZE; column++)
 				{
-					// TODO: Fix offset.
-					Rectangle r = new Rectangle(column * tileSize + screenOptions.Offset.X,
+					Rectangle r = new Rectangle(
+						column * tileSize + screenOptions.Offset.X,
 						row * tileSize + screenOptions.Offset.Y, tileSize, tileSize);
 					toggleColor = !toggleColor;
 					g.FillRectangle(toggleColor ? darkGreen : green, r);
