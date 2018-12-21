@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 
 namespace Reversi
@@ -17,8 +18,8 @@ namespace Reversi
 
 	public partial class Screen : Form
 	{
-		private const int BOARD_WIDTH = 3;
-		private const int BOARD_HEIGHT = 3;
+		private const int BOARD_WIDTH = 6;
+		private const int BOARD_HEIGHT = 6;
 
 		private readonly Point[] ALL_DELTAS =
 		{
@@ -32,36 +33,46 @@ namespace Reversi
 			new Point(1, -1)
 		};
 
-		SolidBrush semiTransparentBrush = new SolidBrush(Color.FromArgb(128, 255, 255, 255));
+		private readonly SolidBrush playerOneHintBrush = new SolidBrush(Color.FromArgb(128, 0, 0, 0));
+		private readonly SolidBrush playerTwoHintBrush = new SolidBrush(Color.FromArgb(128, 255, 255, 255));
 
-		private readonly PictureBox graphics;
-		private readonly FieldState[,] board;
+		//private readonly PictureBox canvas;
+		private FieldState[,] board;
+
 		private FieldState currentPlayer;
+		private int playerOnePieces;
+		private int playerTwoPieces;
+		private int passAmount = 0;
+		private bool showHints = true;
+		private bool gameEnded;
 
 		public Screen()
 		{
-			graphics = new PictureBox
-			{
-				Size = new Size(ClientRectangle.Size.Width, ClientRectangle.Size.Height)
-			};
-
-			graphics.Paint += Render;
-			Resize += UpdateBoardSize;
-			graphics.MouseClick += OnClick;
-			Controls.Add(graphics);
-
-			board = new FieldState[BOARD_HEIGHT, BOARD_WIDTH];
-			CreateInitialBoard();
-			currentPlayer = FieldState.PlayerOne;
-			CalculateHints();
-
 			InitializeComponent();
+
+			canvas.Paint += Render;
+			Resize += UpdateBoardSize;
+			canvas.MouseClick += OnClick;
+			Controls.Add(canvas);
+
+			NewGame();
 		}
 
 		private void UpdateBoardSize(object sender, EventArgs e)
 		{
-			Control control = (Control) sender;
-			graphics.Size = new Size(control.ClientRectangle.Size.Width, control.ClientRectangle.Size.Height);
+			Control control = (Control)sender;
+			canvas.Size = new Size(control.ClientSize.Width, control.ClientSize.Height - canvas.Location.Y);
+			Invalidate(true);
+		}
+
+		private void NewGame(object sender = null, EventArgs e = null)
+		{
+			gameEnded = false;
+			board = new FieldState[BOARD_HEIGHT, BOARD_WIDTH];
+			CreateInitialBoard();
+			currentPlayer = FieldState.PlayerOne;
+
+			DetermineBoardState();
 			Invalidate(true);
 		}
 
@@ -85,6 +96,7 @@ namespace Reversi
 
 			ScreenOptions screenOptions = CalculateScreenOptions();
 			int tileSize = screenOptions.TileSize;
+			int hintSizeDifference = tileSize / 2;
 
 			bool toggleColor = false;
 			for (int row = 0; row < BOARD_HEIGHT; row++)
@@ -96,12 +108,19 @@ namespace Reversi
 						column * tileSize + screenOptions.Offset.X,
 						row * tileSize + screenOptions.Offset.Y, tileSize, tileSize);
 					toggleColor = !toggleColor;
-					g.FillRectangle(toggleColor ? Brushes.DarkGreen: Brushes.Green, r);
+					g.FillRectangle(toggleColor ? Brushes.DarkGreen : Brushes.Green, r);
 
 					switch (board[row, column])
 					{
 						case FieldState.Hint:
-							g.FillEllipse(semiTransparentBrush, r);
+							if (showHints)
+							{
+								g.FillEllipse(currentPlayer == FieldState.PlayerOne ? playerOneHintBrush : playerTwoHintBrush,
+									r.X + hintSizeDifference / 2,
+									r.Y + hintSizeDifference / 2,
+									tileSize - hintSizeDifference,
+									tileSize - hintSizeDifference);
+							}
 							break;
 						case FieldState.PlayerOne:
 							g.FillEllipse(Brushes.Black, r);
@@ -120,14 +139,14 @@ namespace Reversi
 
 		private ScreenOptions CalculateScreenOptions()
 		{
-			int sizeMin = Math.Min(graphics.Size.Width, graphics.Size.Height);
+			int sizeMin = Math.Min(canvas.Size.Width, canvas.Size.Height);
 			int tileSize = sizeMin / Math.Max(BOARD_WIDTH, BOARD_HEIGHT);
 			return new ScreenOptions
 			{
 				TileSize = tileSize,
 				Offset = new Point(
-					(graphics.Size.Width - tileSize * BOARD_WIDTH) / 2,
-					(graphics.Size.Height - tileSize * BOARD_HEIGHT) / 2)
+					(canvas.Size.Width - tileSize * BOARD_WIDTH) / 2,
+					(canvas.Size.Height - tileSize * BOARD_HEIGHT) / 2)
 			};
 		}
 
@@ -135,8 +154,8 @@ namespace Reversi
 		{
 			ScreenOptions screenOptions = CalculateScreenOptions();
 			// Translate the clicked location to a location on the board.
-			int row = (int) Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double) (BOARD_HEIGHT * screenOptions.TileSize) * BOARD_HEIGHT) - 1;
-			int column = (int) Math.Ceiling((e.X - screenOptions.Offset.X) / (double) (BOARD_WIDTH * screenOptions.TileSize) * BOARD_WIDTH) - 1;
+			int row = (int)Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double)(BOARD_HEIGHT * screenOptions.TileSize) * BOARD_HEIGHT) - 1;
+			int column = (int)Math.Ceiling((e.X - screenOptions.Offset.X) / (double)(BOARD_WIDTH * screenOptions.TileSize) * BOARD_WIDTH) - 1;
 
 			// If the clicked tile is outside board bounds or
 			// if the field has a piece, return.
@@ -147,7 +166,7 @@ namespace Reversi
 			{
 				return;
 			}
-			
+
 			var validPieces = CalculateValidPieces(row, column);
 			// If the move is invalid, return.
 			if (!validPieces.Any())
@@ -164,11 +183,22 @@ namespace Reversi
 			// Set the clicked tile to the current player's color as well.
 			board[row, column] = currentPlayer;
 
-			// Swap players.
+			SwapPlayers();
+
+			Invalidate(true);
+		}
+
+		private void SwapPlayers()
+		{
 			currentPlayer = OtherPlayer();
 
-			CalculateHints();
-			Invalidate(true);
+			// If there are no valid moves, enable the pass button.
+			bool boardHasValidMoves = DetermineBoardState();
+			passButton.Enabled = !boardHasValidMoves;
+			if (boardHasValidMoves)
+			{
+				passAmount = 0;
+			}
 		}
 
 		private FieldState OtherPlayer()
@@ -176,18 +206,85 @@ namespace Reversi
 			return currentPlayer == FieldState.PlayerOne ? FieldState.PlayerTwo : FieldState.PlayerOne;
 		}
 
-		private void CalculateHints()
+		/// <summary>
+		/// Counts the pieces per player and set hints where needed.
+		/// </summary>
+		/// <returns>True if the board still has moves available for the current player, else false.</returns>
+		private bool DetermineBoardState()
 		{
+			playerOnePieces = 0;
+			playerTwoPieces = 0;
+
+			int hintAmount = 0;
+
 			for (int row = 0; row < BOARD_HEIGHT; row++)
 			{
 				for (int column = 0; column < BOARD_WIDTH; column++)
 				{
-					if (CalculateValidPieces(row, column).Any())
+					if (board[row, column] == FieldState.PlayerOne)
 					{
+						playerOnePieces++;
+						// Don't set hints to the fields that already contain a player piece.
+					}
+					else if (board[row, column] == FieldState.PlayerTwo)
+					{
+						playerTwoPieces++;
+					}
+					else if (CalculateValidPieces(row, column).Any())
+					{
+						// If the field has a valid move, place a hint.
 						board[row, column] = FieldState.Hint;
+						hintAmount++;
+					}
+					else
+					{
+						// If it doesn't, make it empty.
+						board[row, column] = FieldState.Empty;
 					}
 				}
 			}
+
+			UpdateUI();
+			// Zero hints mean we don't have any moves available.
+			return hintAmount != 0;
+		}
+
+		private void UpdateUI()
+		{
+			StringBuilder sb = new StringBuilder();
+
+			if (gameEnded)
+			{
+				if (playerOnePieces == playerTwoPieces)
+				{
+					sb.Append("Remise");
+				}
+				else if (playerOnePieces > playerTwoPieces)
+				{
+					sb.Append("Black has won!");
+				}
+				else
+				{
+					sb.Append("White has won!");
+				}
+
+				// Because labels don't support tabs, we're just adding 8 spaces.
+				sb.Append("        ");
+			}
+
+			if (!gameEnded && currentPlayer == FieldState.PlayerOne)
+			{
+				sb.Append("Black's Turn        ");
+			}
+			sb.Append($"Black: {playerOnePieces}\n");
+
+			if (!gameEnded && currentPlayer == FieldState.PlayerTwo)
+			{
+				sb.Append("White's Turn        ");
+			}
+			sb.Append($"White: {playerTwoPieces}");
+
+			gameStatsLabel.Text = sb.ToString();
 		}
 
 		private IEnumerable<Point> CalculateValidPieces(int row, int column)
@@ -210,9 +307,9 @@ namespace Reversi
 			{
 				// If inside board bounds ...
 				if (row + rowDelta < BOARD_HEIGHT &&
-				    row + rowDelta >= 0 &&
-				    column + columnDelta < BOARD_WIDTH &&
-				    column + columnDelta >= 0)
+					row + rowDelta >= 0 &&
+					column + columnDelta < BOARD_WIDTH &&
+					column + columnDelta >= 0)
 				{
 					// ... Check if current tile + delta is 'correct' ...
 					if (board[row + rowDelta, column + columnDelta] == toCheck)
@@ -245,6 +342,29 @@ namespace Reversi
 
 			// This is a valid move, so return the valid changeable pieces.
 			return otherPieces;
+		}
+
+		private void HintButton_Click(object sender, EventArgs e)
+		{
+			showHints = !showHints;
+			hintButton.Text = showHints ? "Hide Hints" : "Show Hints";
+			Invalidate(true);
+		}
+
+		private void PassButton_Click(object sender, EventArgs e)
+		{
+			if (passAmount == 1)
+			{
+				gameEnded = true;
+				passButton.Enabled = false;
+				DetermineBoardState();
+				Invalidate(true);
+				return;
+			}
+
+			passAmount++;
+			SwapPlayers();
+			Invalidate(true);
 		}
 	}
 }
