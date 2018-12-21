@@ -194,7 +194,7 @@ namespace Reversi
 
 			// If there are no valid moves, enable the pass button.
 			bool boardHasValidMoves = DetermineBoardState();
-			passButton.Enabled = !boardHasValidMoves;
+			passButton.Enabled = !boardHasValidMoves && !gameEnded;
 			if (boardHasValidMoves)
 			{
 				passAmount = 0;
@@ -244,47 +244,11 @@ namespace Reversi
 				}
 			}
 
+			gameEnded = playerOnePieces + playerTwoPieces == BOARD_WIDTH * BOARD_HEIGHT;
+
 			UpdateUI();
 			// Zero hints mean we don't have any moves available.
 			return hintAmount != 0;
-		}
-
-		private void UpdateUI()
-		{
-			StringBuilder sb = new StringBuilder();
-
-			if (gameEnded)
-			{
-				if (playerOnePieces == playerTwoPieces)
-				{
-					sb.Append("Remise");
-				}
-				else if (playerOnePieces > playerTwoPieces)
-				{
-					sb.Append("Black has won!");
-				}
-				else
-				{
-					sb.Append("White has won!");
-				}
-
-				// Because labels don't support tabs, we're just adding 8 spaces.
-				sb.Append("        ");
-			}
-
-			if (!gameEnded && currentPlayer == FieldState.PlayerOne)
-			{
-				sb.Append("Black's Turn        ");
-			}
-			sb.Append($"Black: {playerOnePieces}\n");
-
-			if (!gameEnded && currentPlayer == FieldState.PlayerTwo)
-			{
-				sb.Append("White's Turn        ");
-			}
-			sb.Append($"White: {playerTwoPieces}");
-
-			gameStatsLabel.Text = sb.ToString();
 		}
 
 		private IEnumerable<Point> CalculateValidPieces(int row, int column)
@@ -344,13 +308,6 @@ namespace Reversi
 			return otherPieces;
 		}
 
-		private void HintButton_Click(object sender, EventArgs e)
-		{
-			showHints = !showHints;
-			hintButton.Text = showHints ? "Hide Hints" : "Show Hints";
-			Invalidate(true);
-		}
-
 		private void PassButton_Click(object sender, EventArgs e)
 		{
 			if (passAmount == 1)
@@ -365,6 +322,51 @@ namespace Reversi
 			passAmount++;
 			SwapPlayers();
 			Invalidate(true);
+		}
+
+		private void HintButton_Click(object sender, EventArgs e)
+		{
+			showHints = !showHints;
+			hintButton.Text = showHints ? "Hide Hints" : "Show Hints";
+			Invalidate(true);
+		}
+
+		private void UpdateUI()
+		{
+			StringBuilder sb = new StringBuilder();
+
+			if (gameEnded)
+			{
+				if (playerOnePieces == playerTwoPieces)
+				{
+					sb.Append("Remise");
+				}
+				else if (playerOnePieces > playerTwoPieces)
+				{
+					sb.Append("Black has won!");
+				}
+				else
+				{
+					sb.Append("White has won!");
+				}
+
+				// Because labels don't support tabs, we're just adding 8 spaces.
+				sb.Append("        ");
+			}
+
+			if (!gameEnded && currentPlayer == FieldState.PlayerOne)
+			{
+				sb.Append("Black's Turn        ");
+			}
+			sb.Append($"Black: {playerOnePieces}\n");
+
+			if (!gameEnded && currentPlayer == FieldState.PlayerTwo)
+			{
+				sb.Append("White's Turn        ");
+			}
+			sb.Append($"White: {playerTwoPieces}");
+
+			gameStatsLabel.Text = sb.ToString();
 		}
 	}
 }
