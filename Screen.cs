@@ -35,10 +35,8 @@ namespace Reversi
 
 		private readonly SolidBrush playerOneHintBrush = new SolidBrush(Color.FromArgb(128, 0, 0, 0));
 		private readonly SolidBrush playerTwoHintBrush = new SolidBrush(Color.FromArgb(128, 255, 255, 255));
-
-		//private readonly PictureBox canvas;
+		
 		private FieldState[,] board;
-
 		private FieldState currentPlayer;
 		private int playerOnePieces;
 		private int playerTwoPieces;
@@ -184,7 +182,6 @@ namespace Reversi
 			board[row, column] = currentPlayer;
 
 			SwapPlayers();
-
 			Invalidate(true);
 		}
 
@@ -243,8 +240,11 @@ namespace Reversi
 					}
 				}
 			}
-
-			gameEnded = playerOnePieces + playerTwoPieces == BOARD_WIDTH * BOARD_HEIGHT;
+			
+			if (playerOnePieces + playerTwoPieces == BOARD_WIDTH * BOARD_HEIGHT)
+			{
+				gameEnded = true;
+			}
 
 			UpdateUI();
 			// Zero hints mean we don't have any moves available.
