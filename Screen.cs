@@ -42,7 +42,7 @@ namespace Reversi
 		private FieldState currentPlayer;
 		private int playerOnePieces;
 		private int playerTwoPieces;
-		private int passAmount = 0;
+		private int passAmount;
 		private bool showHints = true;
 		private bool gameEnded;
 
@@ -60,7 +60,7 @@ namespace Reversi
 
 		private void UpdateBoardSize(object sender, EventArgs e)
 		{
-			Control control = (Control)sender;
+			Control control = (Control) sender;
 			canvas.Size = new Size(control.ClientSize.Width, control.ClientSize.Height - canvas.Location.Y);
 			Invalidate(true);
 		}
@@ -68,8 +68,8 @@ namespace Reversi
 		private void NewGame(object sender = null, EventArgs e = null)
 		{
 			gameEnded = false;
-			boardRows = (int)rowsInput.Value;
-			boardColumns = (int)columnsInput.Value;
+			boardRows = (int) rowsInput.Value;
+			boardColumns = (int) columnsInput.Value;
 			board = new FieldState[boardRows, boardColumns];
 			CreateInitialBoard();
 			currentPlayer = FieldState.PlayerOne;
@@ -117,12 +117,14 @@ namespace Reversi
 						case FieldState.Hint:
 							if (showHints)
 							{
-								g.FillEllipse(currentPlayer == FieldState.PlayerOne ? playerOneHintBrush : playerTwoHintBrush,
+								g.FillEllipse(
+									currentPlayer == FieldState.PlayerOne ? playerOneHintBrush : playerTwoHintBrush,
 									r.X + hintSizeDifference / 2,
 									r.Y + hintSizeDifference / 2,
 									tileSize - hintSizeDifference,
 									tileSize - hintSizeDifference);
 							}
+
 							break;
 						case FieldState.PlayerOne:
 							g.FillEllipse(Brushes.Black, r);
@@ -130,11 +132,9 @@ namespace Reversi
 						case FieldState.PlayerTwo:
 							g.FillEllipse(Brushes.White, r);
 							break;
-						default:
-							break;
 					}
 				}
-				
+
 				toggleColor = !toggleColor;
 			}
 		}
@@ -156,20 +156,23 @@ namespace Reversi
 		{
 			ScreenOptions screenOptions = CalculateScreenOptions();
 			// Translate the clicked location to a location on the board.
-			int row = (int)Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double)(boardRows * screenOptions.TileSize) * boardRows) - 1;
-			int column = (int)Math.Ceiling((e.X - screenOptions.Offset.X) / (double)(boardColumns * screenOptions.TileSize) * boardColumns) - 1;
+			int row = (int) Math.Ceiling((e.Y - screenOptions.Offset.Y) /
+			                             (double) (boardRows * screenOptions.TileSize) * boardRows) - 1;
+			int column = (int) Math.Ceiling((e.X - screenOptions.Offset.X) /
+			                                (double) (boardColumns * screenOptions.TileSize) * boardColumns) - 1;
 
 			// If the clicked tile is outside board bounds or
 			// if the field has a piece, return.
 			if (row < 0 || row > boardRows - 1 ||
-				column < 0 || column > boardColumns - 1 ||
-				board[row, column] == FieldState.PlayerOne ||
-				board[row, column] == FieldState.PlayerTwo)
+			    column < 0 || column > boardColumns - 1 ||
+			    board[row, column] == FieldState.PlayerOne ||
+			    board[row, column] == FieldState.PlayerTwo)
 			{
 				return;
 			}
 
-			var validPieces = CalculateValidPieces(row, column);
+			// Converting to an array to prevent multiple enumeration for Any and the foreach.
+			var validPieces = CalculateValidPieces(row, column).ToArray();
 			// If the move is invalid, return.
 			if (!validPieces.Any())
 			{
@@ -244,7 +247,7 @@ namespace Reversi
 					}
 				}
 			}
-			
+
 			if (playerOnePieces + playerTwoPieces == boardColumns * boardRows)
 			{
 				gameEnded = true;
@@ -270,16 +273,17 @@ namespace Reversi
 			return validPieces;
 		}
 
-		private IEnumerable<Point> OtherPiecesInDirection(FieldState toCheck, int row, int column, int rowDelta, int columnDelta)
+		private IEnumerable<Point> OtherPiecesInDirection(FieldState toCheck, int row, int column, int rowDelta,
+			int columnDelta)
 		{
 			var otherPieces = new List<Point>();
 			while (true)
 			{
 				// If inside board bounds ...
 				if (row + rowDelta < boardRows &&
-					row + rowDelta >= 0 &&
-					column + columnDelta < boardColumns &&
-					column + columnDelta >= 0)
+				    row + rowDelta >= 0 &&
+				    column + columnDelta < boardColumns &&
+				    column + columnDelta >= 0)
 				{
 					// ... Check if current tile + delta is 'correct' ...
 					if (board[row + rowDelta, column + columnDelta] == toCheck)
@@ -365,12 +369,14 @@ namespace Reversi
 			{
 				sb.Append("Black's Turn        ");
 			}
+
 			sb.Append($"Black: {playerOnePieces}\n");
 
 			if (!gameEnded && currentPlayer == FieldState.PlayerTwo)
 			{
 				sb.Append("White's Turn        ");
 			}
+
 			sb.Append($"White: {playerTwoPieces}");
 
 			gameStatsLabel.Text = sb.ToString();
