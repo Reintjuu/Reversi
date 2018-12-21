@@ -32,6 +32,8 @@ namespace Reversi
 			new Point(1, -1)
 		};
 
+		SolidBrush semiTransparentBrush = new SolidBrush(Color.FromArgb(128, 255, 255, 255));
+
 		private readonly PictureBox graphics;
 		private readonly FieldState[,] board;
 		private FieldState currentPlayer;
@@ -51,6 +53,7 @@ namespace Reversi
 			board = new FieldState[BOARD_HEIGHT, BOARD_WIDTH];
 			CreateInitialBoard();
 			currentPlayer = FieldState.PlayerOne;
+			CalculateHints();
 
 			InitializeComponent();
 		}
@@ -98,7 +101,7 @@ namespace Reversi
 					switch (board[row, column])
 					{
 						case FieldState.Hint:
-							g.FillEllipse(Brushes.WhiteSmoke, r);
+							g.FillEllipse(semiTransparentBrush, r);
 							break;
 						case FieldState.PlayerOne:
 							g.FillEllipse(Brushes.Black, r);
@@ -139,7 +142,8 @@ namespace Reversi
 			// if the field has a piece, return.
 			if (row < 0 || row > BOARD_HEIGHT - 1 ||
 				column < 0 || column > BOARD_WIDTH - 1 ||
-				board[row, column] != 0)
+				board[row, column] == FieldState.PlayerOne ||
+				board[row, column] == FieldState.PlayerTwo)
 			{
 				return;
 			}
@@ -163,12 +167,27 @@ namespace Reversi
 			// Swap players.
 			currentPlayer = OtherPlayer();
 
+			CalculateHints();
 			Invalidate(true);
 		}
 
 		private FieldState OtherPlayer()
 		{
 			return currentPlayer == FieldState.PlayerOne ? FieldState.PlayerTwo : FieldState.PlayerOne;
+		}
+
+		private void CalculateHints()
+		{
+			for (int row = 0; row < BOARD_HEIGHT; row++)
+			{
+				for (int column = 0; column < BOARD_WIDTH; column++)
+				{
+					if (CalculateValidPieces(row, column).Any())
+					{
+						board[row, column] = FieldState.Hint;
+					}
+				}
+			}
 		}
 
 		private IEnumerable<Point> CalculateValidPieces(int row, int column)
