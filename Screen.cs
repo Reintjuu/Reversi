@@ -9,18 +9,8 @@ namespace Reversi
 {
 	public partial class Screen : Form
 	{
-		// Fix to avoid flickering.
-		protected override CreateParams CreateParams
-		{
-			get
-			{
-				CreateParams handleParam = base.CreateParams;
-				handleParam.ExStyle |= 0x02000000;
-				return handleParam;
-			}
-		}
-
-		private const int BOARD_SIZE = 8;
+		private const int BOARD_WIDTH = 3;
+		private const int BOARD_HEIGHT = 3;
 
 		private readonly Point[] ALL_DELTAS =
 		{
@@ -34,25 +24,23 @@ namespace Reversi
 			new Point(1, -1)
 		};
 
-		private readonly Brush darkGreen = new Pen(Color.DarkGreen).Brush;
-		private readonly Brush green = new Pen(Color.Green).Brush;
-		private readonly Brush white = new Pen(Color.White).Brush;
-		private readonly Brush black = new Pen(Color.Black).Brush;
-
 		private readonly PictureBox graphics;
 		private readonly int[,] board;
 		private int currentPlayer;
 
 		public Screen()
 		{
-			graphics = new PictureBox();
-			graphics.Size = new Size(ClientRectangle.Size.Width, ClientRectangle.Size.Height);
+			graphics = new PictureBox
+			{
+				Size = new Size(ClientRectangle.Size.Width, ClientRectangle.Size.Height)
+			};
+
 			graphics.Paint += Render;
 			Resize += UpdateBoardSize;
 			graphics.MouseClick += OnClick;
 			Controls.Add(graphics);
 
-			board = new int[BOARD_SIZE, BOARD_SIZE];
+			board = new int[BOARD_HEIGHT, BOARD_WIDTH];
 			CreateInitialBoard();
 			currentPlayer = 1;
 
@@ -63,11 +51,12 @@ namespace Reversi
 		{
 			Control control = (Control) sender;
 			graphics.Size = new Size(control.ClientRectangle.Size.Width, control.ClientRectangle.Size.Height);
+			Invalidate(true);
 		}
 
 		private void CreateInitialBoard()
 		{
-			PlaceInitialStartingSquare(BOARD_SIZE / 2 - 1, BOARD_SIZE / 2 - 1);
+			PlaceInitialStartingSquare(BOARD_HEIGHT / 2 - 1, BOARD_WIDTH / 2 - 1);
 		}
 
 		private void PlaceInitialStartingSquare(int startRow, int startColumn)
@@ -87,22 +76,22 @@ namespace Reversi
 			int tileSize = screenOptions.TileSize;
 
 			bool toggleColor = false;
-			for (int row = 0; row < BOARD_SIZE; row++)
+			for (int row = 0; row < BOARD_HEIGHT; row++)
 			{
-				for (int column = 0; column < BOARD_SIZE; column++)
+				for (int column = 0; column < BOARD_WIDTH; column++)
 				{
 					Rectangle r = new Rectangle(
 						column * tileSize + screenOptions.Offset.X,
 						row * tileSize + screenOptions.Offset.Y, tileSize, tileSize);
 					toggleColor = !toggleColor;
-					g.FillRectangle(toggleColor ? darkGreen : green, r);
+					g.FillRectangle(toggleColor ? Brushes.DarkGreen: Brushes.Green, r);
 
 					if (board[row, column] == 0)
 					{
 						continue;
 					}
 
-					g.FillEllipse(board[row, column] == 1 ? black : white, r);
+					g.FillEllipse(board[row, column] == 1 ? Brushes.Black : Brushes.White, r);
 				}
 
 				toggleColor = !toggleColor;
@@ -112,34 +101,51 @@ namespace Reversi
 		private ScreenOptions CalculateScreenOptions()
 		{
 			int sizeMin = Math.Min(graphics.Size.Width, graphics.Size.Height);
-			int tileSize = sizeMin / BOARD_SIZE;
+			int tileSize = sizeMin / Math.Max(BOARD_WIDTH, BOARD_HEIGHT);
 			return new ScreenOptions
 			{
 				TileSize = tileSize,
 				Offset = new Point(
-					(graphics.Size.Width - tileSize * BOARD_SIZE) / 2,
-					(graphics.Size.Height - tileSize * BOARD_SIZE) / 2)
+					(graphics.Size.Width - tileSize * BOARD_WIDTH) / 2,
+					(graphics.Size.Height - tileSize * BOARD_HEIGHT) / 2)
 			};
 		}
 
 		private void OnClick(object sender, MouseEventArgs e)
 		{
 			ScreenOptions screenOptions = CalculateScreenOptions();
-			int row = (int) Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double) (BOARD_SIZE * screenOptions.TileSize) * BOARD_SIZE) - 1;
-			int column = (int) Math.Ceiling((e.X - screenOptions.Offset.X) / (double) (BOARD_SIZE * screenOptions.TileSize) * BOARD_SIZE) - 1;
+			int row = (int) Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double) (BOARD_HEIGHT * screenOptions.TileSize) * BOARD_HEIGHT) - 1;
+			int column = (int) Math.Ceiling((e.X - screenOptions.Offset.X) / (double) (BOARD_WIDTH * screenOptions.TileSize) * BOARD_WIDTH) - 1;
 
-			// If the field has a piece, return.
-			if (board[row, column] != 0 || !IsValid(row, column))
+			// If the clicked tile is outside board bounds or
+			// if the field has a piece, return.
+			if (row < 0 || row > BOARD_HEIGHT - 1 ||
+				column < 0 || column > BOARD_WIDTH - 1 ||
+				board[row, column] != 0)
+			{
+				return;
+			}
+			
+			var validPieces = CalculateValidPieces(row, column);
+			// If the move is invalid, return.
+			if (!validPieces.Any())
 			{
 				return;
 			}
 
+			// Change all valid pieces to the current player's color.
+			foreach (var pieceToChange in validPieces)
+			{
+				board[pieceToChange.Y, pieceToChange.X] = currentPlayer;
+			}
+
+			// Set the clicked tile to the current player's color as well.
 			board[row, column] = currentPlayer;
 
 			// Swap players.
 			currentPlayer = OtherPlayer();
 
-			Invalidate();
+			Invalidate(true);
 		}
 
 		private int OtherPlayer()
@@ -147,34 +153,28 @@ namespace Reversi
 			return currentPlayer == 1 ? 2 : 1;
 		}
 
-		private bool IsValid(int row, int column)
+		private IEnumerable<Point> CalculateValidPieces(int row, int column)
 		{
 			int other = OtherPlayer();
-			bool valid = false;
+			var validPieces = new List<Point>();
 
-			foreach (var d in ALL_DELTAS)
+			foreach (Point d in ALL_DELTAS)
 			{
-				foreach (var pieceToChange in OtherPiecesInDirection(other, row, column, d.X, d.Y))
-				{
-					// Change a valid piece.
-					board[pieceToChange.Y, pieceToChange.X] = currentPlayer;
-					// Apparently this is a valid move, otherwise we wouldn't have changed a piece.
-					valid = true;
-				}
+				validPieces.AddRange(OtherPiecesInDirection(other, row, column, d.X, d.Y));
 			}
 
-			return valid;
+			return validPieces;
 		}
 
-		private List<Point> OtherPiecesInDirection(int toCheck, int row, int column, int rowDelta, int columnDelta)
+		private IEnumerable<Point> OtherPiecesInDirection(int toCheck, int row, int column, int rowDelta, int columnDelta)
 		{
 			var otherPieces = new List<Point>();
 			while (true)
 			{
 				// If inside board bounds ...
-				if (row + rowDelta < BOARD_SIZE &&
+				if (row + rowDelta < BOARD_HEIGHT &&
 				    row + rowDelta >= 0 &&
-				    column + columnDelta < BOARD_SIZE &&
+				    column + columnDelta < BOARD_WIDTH &&
 				    column + columnDelta >= 0)
 				{
 					// ... Check if current tile + delta is 'correct' ...
@@ -192,13 +192,13 @@ namespace Reversi
 						}
 
 						// No more tiles in this direction and the last tile is not from the current player, so return an empty list.
-						return new List<Point>();
+						return Enumerable.Empty<Point>();
 					}
 				}
 				else
 				{
-					// Outside of board bounds, so break the loop.
-					break;
+					// Outside of board bounds, so this move is invalid, return an empty list.
+					return Enumerable.Empty<Point>();
 				}
 
 				row += rowDelta;
