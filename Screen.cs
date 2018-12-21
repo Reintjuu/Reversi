@@ -7,6 +7,14 @@ using System.Windows.Forms;
 
 namespace Reversi
 {
+	public enum FieldState
+	{
+		Empty,
+		Hint,
+		PlayerOne,
+		PlayerTwo
+	}
+
 	public partial class Screen : Form
 	{
 		private const int BOARD_WIDTH = 3;
@@ -25,8 +33,8 @@ namespace Reversi
 		};
 
 		private readonly PictureBox graphics;
-		private readonly int[,] board;
-		private int currentPlayer;
+		private readonly FieldState[,] board;
+		private FieldState currentPlayer;
 
 		public Screen()
 		{
@@ -40,9 +48,9 @@ namespace Reversi
 			graphics.MouseClick += OnClick;
 			Controls.Add(graphics);
 
-			board = new int[BOARD_HEIGHT, BOARD_WIDTH];
+			board = new FieldState[BOARD_HEIGHT, BOARD_WIDTH];
 			CreateInitialBoard();
-			currentPlayer = 1;
+			currentPlayer = FieldState.PlayerOne;
 
 			InitializeComponent();
 		}
@@ -61,10 +69,10 @@ namespace Reversi
 
 		private void PlaceInitialStartingSquare(int startRow, int startColumn)
 		{
-			board[startRow, startColumn++] = 2;
-			board[startRow++, startColumn] = 1;
-			board[startRow, startColumn--] = 2;
-			board[startRow, startColumn] = 1;
+			board[startRow, startColumn++] = FieldState.PlayerTwo;
+			board[startRow++, startColumn] = FieldState.PlayerOne;
+			board[startRow, startColumn--] = FieldState.PlayerTwo;
+			board[startRow, startColumn] = FieldState.PlayerOne;
 		}
 
 		private void Render(object sender, PaintEventArgs e)
@@ -80,18 +88,27 @@ namespace Reversi
 			{
 				for (int column = 0; column < BOARD_WIDTH; column++)
 				{
+					// Draw the board with (dark) green tiles.
 					Rectangle r = new Rectangle(
 						column * tileSize + screenOptions.Offset.X,
 						row * tileSize + screenOptions.Offset.Y, tileSize, tileSize);
 					toggleColor = !toggleColor;
 					g.FillRectangle(toggleColor ? Brushes.DarkGreen: Brushes.Green, r);
 
-					if (board[row, column] == 0)
+					switch (board[row, column])
 					{
-						continue;
+						case FieldState.Hint:
+							g.FillEllipse(Brushes.WhiteSmoke, r);
+							break;
+						case FieldState.PlayerOne:
+							g.FillEllipse(Brushes.Black, r);
+							break;
+						case FieldState.PlayerTwo:
+							g.FillEllipse(Brushes.White, r);
+							break;
+						default:
+							continue;
 					}
-
-					g.FillEllipse(board[row, column] == 1 ? Brushes.Black : Brushes.White, r);
 				}
 
 				toggleColor = !toggleColor;
@@ -114,6 +131,7 @@ namespace Reversi
 		private void OnClick(object sender, MouseEventArgs e)
 		{
 			ScreenOptions screenOptions = CalculateScreenOptions();
+			// Translate the clicked location to a location on the board.
 			int row = (int) Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double) (BOARD_HEIGHT * screenOptions.TileSize) * BOARD_HEIGHT) - 1;
 			int column = (int) Math.Ceiling((e.X - screenOptions.Offset.X) / (double) (BOARD_WIDTH * screenOptions.TileSize) * BOARD_WIDTH) - 1;
 
@@ -148,14 +166,14 @@ namespace Reversi
 			Invalidate(true);
 		}
 
-		private int OtherPlayer()
+		private FieldState OtherPlayer()
 		{
-			return currentPlayer == 1 ? 2 : 1;
+			return currentPlayer == FieldState.PlayerOne ? FieldState.PlayerTwo : FieldState.PlayerOne;
 		}
 
 		private IEnumerable<Point> CalculateValidPieces(int row, int column)
 		{
-			int other = OtherPlayer();
+			FieldState other = OtherPlayer();
 			var validPieces = new List<Point>();
 
 			foreach (Point d in ALL_DELTAS)
@@ -166,7 +184,7 @@ namespace Reversi
 			return validPieces;
 		}
 
-		private IEnumerable<Point> OtherPiecesInDirection(int toCheck, int row, int column, int rowDelta, int columnDelta)
+		private IEnumerable<Point> OtherPiecesInDirection(FieldState toCheck, int row, int column, int rowDelta, int columnDelta)
 		{
 			var otherPieces = new List<Point>();
 			while (true)
@@ -201,10 +219,12 @@ namespace Reversi
 					return Enumerable.Empty<Point>();
 				}
 
+				// Continue with the next tile in this direction.
 				row += rowDelta;
 				column += columnDelta;
 			}
 
+			// This is a valid move, so return the valid changeable pieces.
 			return otherPieces;
 		}
 	}
