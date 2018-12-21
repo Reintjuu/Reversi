@@ -18,9 +18,6 @@ namespace Reversi
 
 	public partial class Screen : Form
 	{
-		private const int BOARD_WIDTH = 6;
-		private const int BOARD_HEIGHT = 6;
-
 		private readonly Point[] ALL_DELTAS =
 		{
 			new Point(1, 0),
@@ -35,7 +32,12 @@ namespace Reversi
 
 		private readonly SolidBrush playerOneHintBrush = new SolidBrush(Color.FromArgb(128, 0, 0, 0));
 		private readonly SolidBrush playerTwoHintBrush = new SolidBrush(Color.FromArgb(128, 255, 255, 255));
-		
+
+		// The assignment says that these should be constants. However, we
+		// want them to be assignable by the user in the UI.
+		private int boardColumns = 6;
+		private int boardRows = 6;
+
 		private FieldState[,] board;
 		private FieldState currentPlayer;
 		private int playerOnePieces;
@@ -66,7 +68,9 @@ namespace Reversi
 		private void NewGame(object sender = null, EventArgs e = null)
 		{
 			gameEnded = false;
-			board = new FieldState[BOARD_HEIGHT, BOARD_WIDTH];
+			boardRows = (int)rowsInput.Value;
+			boardColumns = (int)columnsInput.Value;
+			board = new FieldState[boardRows, boardColumns];
 			CreateInitialBoard();
 			currentPlayer = FieldState.PlayerOne;
 
@@ -76,7 +80,7 @@ namespace Reversi
 
 		private void CreateInitialBoard()
 		{
-			PlaceInitialStartingSquare(BOARD_HEIGHT / 2 - 1, BOARD_WIDTH / 2 - 1);
+			PlaceInitialStartingSquare(boardRows / 2 - 1, boardColumns / 2 - 1);
 		}
 
 		private void PlaceInitialStartingSquare(int startRow, int startColumn)
@@ -97,9 +101,9 @@ namespace Reversi
 			int hintSizeDifference = tileSize / 2;
 
 			bool toggleColor = false;
-			for (int row = 0; row < BOARD_HEIGHT; row++)
+			for (int row = 0; row < boardRows; row++)
 			{
-				for (int column = 0; column < BOARD_WIDTH; column++)
+				for (int column = 0; column < boardColumns; column++)
 				{
 					// Draw the board with (dark) green tiles.
 					Rectangle r = new Rectangle(
@@ -127,10 +131,10 @@ namespace Reversi
 							g.FillEllipse(Brushes.White, r);
 							break;
 						default:
-							continue;
+							break;
 					}
 				}
-
+				
 				toggleColor = !toggleColor;
 			}
 		}
@@ -138,13 +142,13 @@ namespace Reversi
 		private ScreenOptions CalculateScreenOptions()
 		{
 			int sizeMin = Math.Min(canvas.Size.Width, canvas.Size.Height);
-			int tileSize = sizeMin / Math.Max(BOARD_WIDTH, BOARD_HEIGHT);
+			int tileSize = sizeMin / Math.Max(boardColumns, boardRows);
 			return new ScreenOptions
 			{
 				TileSize = tileSize,
 				Offset = new Point(
-					(canvas.Size.Width - tileSize * BOARD_WIDTH) / 2,
-					(canvas.Size.Height - tileSize * BOARD_HEIGHT) / 2)
+					(canvas.Size.Width - tileSize * boardColumns) / 2,
+					(canvas.Size.Height - tileSize * boardRows) / 2)
 			};
 		}
 
@@ -152,13 +156,13 @@ namespace Reversi
 		{
 			ScreenOptions screenOptions = CalculateScreenOptions();
 			// Translate the clicked location to a location on the board.
-			int row = (int)Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double)(BOARD_HEIGHT * screenOptions.TileSize) * BOARD_HEIGHT) - 1;
-			int column = (int)Math.Ceiling((e.X - screenOptions.Offset.X) / (double)(BOARD_WIDTH * screenOptions.TileSize) * BOARD_WIDTH) - 1;
+			int row = (int)Math.Ceiling((e.Y - screenOptions.Offset.Y) / (double)(boardRows * screenOptions.TileSize) * boardRows) - 1;
+			int column = (int)Math.Ceiling((e.X - screenOptions.Offset.X) / (double)(boardColumns * screenOptions.TileSize) * boardColumns) - 1;
 
 			// If the clicked tile is outside board bounds or
 			// if the field has a piece, return.
-			if (row < 0 || row > BOARD_HEIGHT - 1 ||
-				column < 0 || column > BOARD_WIDTH - 1 ||
+			if (row < 0 || row > boardRows - 1 ||
+				column < 0 || column > boardColumns - 1 ||
 				board[row, column] == FieldState.PlayerOne ||
 				board[row, column] == FieldState.PlayerTwo)
 			{
@@ -214,9 +218,9 @@ namespace Reversi
 
 			int hintAmount = 0;
 
-			for (int row = 0; row < BOARD_HEIGHT; row++)
+			for (int row = 0; row < boardRows; row++)
 			{
-				for (int column = 0; column < BOARD_WIDTH; column++)
+				for (int column = 0; column < boardColumns; column++)
 				{
 					if (board[row, column] == FieldState.PlayerOne)
 					{
@@ -241,12 +245,13 @@ namespace Reversi
 				}
 			}
 			
-			if (playerOnePieces + playerTwoPieces == BOARD_WIDTH * BOARD_HEIGHT)
+			if (playerOnePieces + playerTwoPieces == boardColumns * boardRows)
 			{
 				gameEnded = true;
 			}
 
 			UpdateUI();
+
 			// Zero hints mean we don't have any moves available.
 			return hintAmount != 0;
 		}
@@ -256,6 +261,7 @@ namespace Reversi
 			FieldState other = OtherPlayer();
 			var validPieces = new List<Point>();
 
+			// Add all valid directions to the valid pieces.
 			foreach (Point d in ALL_DELTAS)
 			{
 				validPieces.AddRange(OtherPiecesInDirection(other, row, column, d.X, d.Y));
@@ -270,9 +276,9 @@ namespace Reversi
 			while (true)
 			{
 				// If inside board bounds ...
-				if (row + rowDelta < BOARD_HEIGHT &&
+				if (row + rowDelta < boardRows &&
 					row + rowDelta >= 0 &&
-					column + columnDelta < BOARD_WIDTH &&
+					column + columnDelta < boardColumns &&
 					column + columnDelta >= 0)
 				{
 					// ... Check if current tile + delta is 'correct' ...
@@ -310,6 +316,7 @@ namespace Reversi
 
 		private void PassButton_Click(object sender, EventArgs e)
 		{
+			// If the other player has passed in his turn, end the game.
 			if (passAmount == 1)
 			{
 				gameEnded = true;
